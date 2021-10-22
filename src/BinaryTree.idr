@@ -13,14 +13,14 @@ interface Functor f => VerifiedFunctor f where
     preservesComposition : {0 g : b -> c} -> {0 h : a -> b} ->   
                            (x: f a) -> map (g . h) x = (map g . map h) x
 
-treePreserversIdentity : (x: Tree a) -> map Prelude.id x = Prelude.id x
-treePreserversIdentity (Branch l x r) = 
-    let ih1 = treePreserversIdentity l
-        ih2 = treePreserversIdentity r in
+treePreservesIdentity : (x: Tree a) -> map Prelude.id x = Prelude.id x
+treePreservesIdentity (Branch l x r) = 
+    let ih1 = treePreservesIdentity l
+        ih2 = treePreservesIdentity r in
     rewrite ih1 in  
     rewrite ih2 in  
     Refl
-treePreserversIdentity Leaf = Refl 
+treePreservesIdentity Leaf = Refl 
 
 treePreservesComposition : {0 g : b -> c} -> {0 h : a -> b} ->   
                         (x: Tree a) -> map (g . h) x = (map g . map h) x
@@ -33,7 +33,7 @@ treePreservesComposition {g} {h} (Branch l x r) =
 treePreservesComposition Leaf = Refl 
 
 VerifiedFunctor Tree where
-    preservesIdentity = treePreserversIdentity
+    preservesIdentity = treePreservesIdentity
     preservesComposition = treePreservesComposition
 
 data Path : a -> Tree a -> Type where
