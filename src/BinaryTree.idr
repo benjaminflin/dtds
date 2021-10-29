@@ -1,6 +1,7 @@
 module BinaryTree
 
-import Control.Order 
+import Decidable.Order.Strict
+import Control.Relation
 
 data Tree a
     = Branch (Tree a) a (Tree a)
@@ -38,54 +39,80 @@ VerifiedFunctor Tree where
     preservesIdentity = treePreservesIdentity
     preservesComposition = treePreservesComposition
 
-data Insert : a -> Tree a -> Tree a -> Type where
-    InsertLeaf : Insert x Leaf (Branch Leaf x Leaf)    
-    InsertLeft : Insert x l l' -> Insert x (Branch l y r) (Branch l' y r)   
-    InsertRight : Insert x r r' -> Insert x (Branch l y r) (Branch l y r')   
 
-data Lte : (a -> a -> Type) -> a -> Tree a -> Type where
-    LteBranch : {0 x, y: a} -> Lte rel x l -> rel x y -> Lte rel x r -> Lte rel x (Branch l y r)
-    LteLeaf : Lte con x Leaf 
+data All : (a -> Type) -> Tree a -> Type where
+    AllBranch :
+        All p l -> 
+        p x -> 
+        All p r -> 
+        All p (Branch l x r) 
+    AllLeaf : All p Leaf 
 
 data OrderedTree : (a -> a -> Type) -> Tree a -> Type where
     OrderedBranch : 
         OrderedTree rel l -> 
         OrderedTree rel r -> 
-        Lte (flip rel) x l -> 
-        Lte rel x r ->
+        All (Not . rel x) l -> 
+        All (rel x) r ->
         OrderedTree rel (Branch l x r)   
     OrderedLeaf : 
         OrderedTree rel Leaf
 
-record ValidTree (a: Type) (tree: Tree a) (rel : a -> a -> Type) where
+record ValidTree (a: Type) (rel : a -> a -> Type) where
     constructor MkValidTree 
-    ordered : OrderedTree rel tree
+    tree: Tree a
+    0 ordered : OrderedTree rel tree
 
-insertLemma : {0 rel : a -> a -> Type} -> rel y x -> Lte rel y t -> Insert x t t' -> Lte rel y t' 
-insertLemma lte _ InsertLeaf = 
-    LteBranch LteLeaf lte LteLeaf 
-insertLemma lte (LteBranch l p r) (InsertLeft il) = 
-    LteBranch (insertLemma lte l il) p r 
-insertLemma lte (LteBranch l p r) (InsertRight ir) = 
-    LteBranch l p (insertLemma lte r ir) 
+data Insert : a -> Tree a -> Tree a -> Type where
+    InsertLeaf : Insert x Leaf (Branch Leaf x Leaf)    
+    InsertLeft : Insert x l l' -> Insert x (Branch l y r) (Branch l' y r)   
+    InsertRight : Insert x r r' -> Insert x (Branch l y r) (Branch l y r')   
 
-insert : (o : StronglyConnex a rel) => 
-         (x: a) -> 
-         (tree: Tree a) -> 
-         ValidTree a tree rel -> 
-         (tree': Tree a ** (ValidTree a tree' rel, Insert x tree tree'))
-insert x Leaf (MkValidTree ordered) = 
-    let ordered' = OrderedBranch OrderedLeaf OrderedLeaf LteLeaf LteLeaf in
-    (Branch Leaf x Leaf ** (MkValidTree ordered', InsertLeaf))
-insert x (Branch l y r) (MkValidTree (OrderedBranch orderedL orderedR lLteY yLteR)) = 
+record ValidInsertion 
+    {0 a: Type}
+    {0 rel: a -> a -> Type}
+    (x: a) 
+    (before: ValidTree a rel) 
+    where
+    constructor MkValidInsertion
+    after : ValidTree a rel 
+    0 insert : Insert x before.tree after.tree  
+
+insertLemma : All p t -> p x -> Insert x t t' -> All p t'    
+insertLemma (AllBranch l p r) pred (InsertLeft il) = 
+    AllBranch (insertLemma l pred il) p r 
+insertLemma (AllBranch l p r) pred (InsertRight ir) = 
+    AllBranch l p (insertLemma r pred ir) 
+insertLemma AllLeaf pred InsertLeaf = 
+    AllBranch AllLeaf pred AllLeaf
+
+
+insert : (o: StrictOrdered a rel) =>
+         (asym: Asymmetric a rel) =>
+         (irr: Irreflexive a rel) =>
+         (x : a) -> 
+         (tree: ValidTree a rel) ->
+         (ValidInsertion x tree) 
+insert x (MkValidTree (Branch l y r) ot@(OrderedBranch orderedL orderedR lLtY yLtR)) = 
     case order @{o} x y of
-        Left xLteY => 
-            let (l' ** (MkValidTree orderedL', insertL')) = insert x l (MkValidTree orderedL) in
-            let lLteY' = insertLemma xLteY lLteY insertL' in   
-            let ordered' = OrderedBranch orderedL' orderedR lLteY' yLteR in
-            (Branch l' y r ** (MkValidTree ordered', InsertLeft insertL'))
-        Right yLteX =>             
-            let (r' ** (MkValidTree orderedR', insertR')) = insert x r (MkValidTree orderedR) in
-            let yLteR' = insertLemma yLteX yLteR insertR' in   
-            let ordered' = OrderedBranch orderedL orderedR' lLteY yLteR' in
-            (Branch l y r' ** (MkValidTree ordered', InsertRight insertR'))
+        DecLT lt => 
+            let (MkValidInsertion (MkValidTree l' orderedL') insertL')
+                = insert x (MkValidTree l orderedL) in
+            let 0 lLtY' = insertLemma lLtY (asymmetric @{asym} lt) insertL' in
+            let 0 ord = OrderedBranch orderedL' orderedR lLtY' yLtR in     
+            MkValidInsertion (MkValidTree (Branch l' y r) ord) (InsertLeft insertL')
+        DecGT gt => 
+            let (MkValidInsertion (MkValidTree r' orderedR') insertR')
+                = insert x (MkValidTree r orderedR) in
+            let 0 yLtR' = insertLemma yLtR gt insertR' in
+            let 0 ord = OrderedBranch orderedL orderedR' lLtY yLtR' in     
+            MkValidInsertion (MkValidTree (Branch l y r') ord) (InsertRight insertR')
+        DecEQ eq => 
+            let (MkValidInsertion (MkValidTree l' orderedL') insertL')
+                = insert x (MkValidTree l orderedL) in
+            let 0 lLtY' = insertLemma lLtY (rewrite eq in irreflexive @{irr}) insertL' in
+            let 0 ord = OrderedBranch orderedL' orderedR lLtY' yLtR in     
+            MkValidInsertion (MkValidTree (Branch l' y r) ord) (InsertLeft insertL')
+insert x (MkValidTree Leaf ordered) = 
+    let ord = OrderedBranch OrderedLeaf OrderedLeaf AllLeaf AllLeaf in  
+    MkValidInsertion (MkValidTree (Branch Leaf x Leaf) ord) InsertLeaf
