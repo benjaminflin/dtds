@@ -15,67 +15,73 @@ open import Agda.Builtin.Bool
 data Player : Set where 
     x o : Player 
 
+-- A Mark on a tic-tac-toe grid may be empty if the grid is not filled 
 Mark : Set
 Mark = Maybe Player 
 
+-- A n × n tic-tac-toe grid
 record Grid : Set where 
     constructor grid
     field
         top-left top-middle top-right : Mark 
         middle-left middle-middle middle-right : Mark 
         bottom-left bottom-middle bottom-right : Mark 
-    
-filled' : Mark → ℕ   
-filled' (just _) = 1 
-filled' nothing = 0 
 
-filled : Grid → ℕ 
-filled (grid top-left top-middle top-right middle-left middle-middle middle-right bottom-left bottom-middle bottom-right) 
-    = sum (map filled' grid-list)
-    where
-        grid-list : List Mark
-        grid-list
-            = top-left 
-            ∷ top-middle 
-            ∷ top-right 
-            ∷ middle-left 
-            ∷ middle-middle 
-            ∷ middle-right 
-            ∷ bottom-left 
-            ∷ bottom-middle 
-            ∷ bottom-right 
-            ∷ []
+record Fillable (a : Set) : Set where    
+    field fill : a → ℕ   
+
+open Fillable {{...}} public
+
+instance 
+    filled-mark : Fillable Mark 
+    fill {{filled-mark}} (just _) = 1  
+    fill {{filled-mark}} nothing = 0  
+
+instance
+    filled-grid : Fillable Grid
+    fill {{filled-grid}} 
+        (grid top-left    top-middle    top-right 
+              middle-left middle-middle middle-right 
+              bottom-left bottom-middle bottom-right) 
+        = sum (map fill grid-list)
+            where
+                grid-list : List Mark
+                grid-list
+                    = top-left ∷ top-middle ∷ top-right 
+                    ∷ middle-left ∷ middle-middle ∷ middle-right 
+                    ∷ bottom-left ∷ bottom-middle ∷ bottom-right 
+                    ∷ []
 
 
-filled'≤1 : ∀ m → filled' m ≤ 1    
-filled'≤1 (just x₁) = s≤s z≤n
-filled'≤1 nothing = z≤n
 
+fill≤1 : (m : Mark) → fill m ≤ 1    
+fill≤1 (just x₁) = s≤s z≤n
+fill≤1 nothing = z≤n
 
 Filled : Grid → Set  
-Filled g = filled g ≡ 9
+Filled g = fill g ≡ 9
 
-filled'-list : ∀ l → sum (map filled' l) ≤ length l 
-filled'-list [] = z≤n
-filled'-list (x' ∷ xs) = +-mono-≤ (filled'≤1 x') (filled'-list xs)
+fill-list-bound : ∀ l → sum (map fill l) ≤ length l 
+fill-list-bound [] = z≤n
+fill-list-bound (m ∷ ms) = +-mono-≤ (fill≤1 m) (fill-list-bound ms)
     
-filled-lemma : ∀ g → Filled g ⊎ filled g ≤ 8 
-filled-lemma (grid (just _) (just _) (just _) (just _) (just _) (just _) (just _) (just _) (just _)) = inj₁ refl
-filled-lemma (grid nothing b c d e f g h i) = inj₂ (filled'-list (b ∷ c ∷ d ∷ e ∷ f ∷ g ∷ h ∷ i ∷ [])) 
-filled-lemma (grid a nothing c d e f g h i) = inj₂ (filled'-list (a ∷ c ∷ d ∷ e ∷ f ∷ g ∷ h ∷ i ∷ [])) 
-filled-lemma (grid a b nothing d e f g h i) = inj₂ (filled'-list (a ∷ b ∷ d ∷ e ∷ f ∷ g ∷ h ∷ i ∷ []))
-filled-lemma (grid a b c nothing e f g h i) = inj₂ (filled'-list (a ∷ b ∷ c ∷ e ∷ f ∷ g ∷ h ∷ i ∷ []))
-filled-lemma (grid a b c d nothing f g h i) = inj₂ (filled'-list (a ∷ b ∷ c ∷ d ∷ f ∷ g ∷ h ∷ i ∷ []))
-filled-lemma (grid a b c d e nothing g h i) = inj₂ (filled'-list (a ∷ b ∷ c ∷ d ∷ e ∷ g ∷ h ∷ i ∷ []))
-filled-lemma (grid a b c d e f nothing h i) = inj₂ (filled'-list (a ∷ b ∷ c ∷ d ∷ e ∷ f ∷ h ∷ i ∷ []))
-filled-lemma (grid a b c d e f g nothing i) = inj₂ (filled'-list (a ∷ b ∷ c ∷ d ∷ e ∷ f ∷ g ∷ i ∷ []))
-filled-lemma (grid a b c d e f g h nothing) = inj₂ (filled'-list (a ∷ b ∷ c ∷ d ∷ e ∷ f ∷ g ∷ h ∷ []))
+fill-lemma : ∀ g → Filled g ⊎ fill g ≤ 8 
+fill-lemma (grid (just _) (just _) (just _) (just _) (just _) (just _) (just _) (just _) (just _)) = inj₁ refl
+fill-lemma (grid nothing b c d e f g h i) = inj₂ (fill-list-bound (b ∷ c ∷ d ∷ e ∷ f ∷ g ∷ h ∷ i ∷ [])) 
+fill-lemma (grid a nothing c d e f g h i) = inj₂ (fill-list-bound (a ∷ c ∷ d ∷ e ∷ f ∷ g ∷ h ∷ i ∷ [])) 
+fill-lemma (grid a b nothing d e f g h i) = inj₂ (fill-list-bound (a ∷ b ∷ d ∷ e ∷ f ∷ g ∷ h ∷ i ∷ []))
+fill-lemma (grid a b c nothing e f g h i) = inj₂ (fill-list-bound (a ∷ b ∷ c ∷ e ∷ f ∷ g ∷ h ∷ i ∷ []))
+fill-lemma (grid a b c d nothing f g h i) = inj₂ (fill-list-bound (a ∷ b ∷ c ∷ d ∷ f ∷ g ∷ h ∷ i ∷ []))
+fill-lemma (grid a b c d e nothing g h i) = inj₂ (fill-list-bound (a ∷ b ∷ c ∷ d ∷ e ∷ g ∷ h ∷ i ∷ []))
+fill-lemma (grid a b c d e f nothing h i) = inj₂ (fill-list-bound (a ∷ b ∷ c ∷ d ∷ e ∷ f ∷ h ∷ i ∷ []))
+fill-lemma (grid a b c d e f g nothing i) = inj₂ (fill-list-bound (a ∷ b ∷ c ∷ d ∷ e ∷ f ∷ g ∷ i ∷ []))
+fill-lemma (grid a b c d e f g h nothing) = inj₂ (fill-list-bound (a ∷ b ∷ c ∷ d ∷ e ∷ f ∷ g ∷ h ∷ []))
 
 Unfilled : Grid → Set  
 Unfilled g = ¬ (Filled g)
 
-filledDec : ∀ {g} → Dec (Filled g)
-filledDec {g} with filled-lemma g 
+filledDec : ∀ g → Dec (Filled g)
+filledDec g with fill-lemma g 
 ... | inj₁ ≡9 = record { does = true; proof = ofʸ ≡9 }
 ... | inj₂ ≤8 = record { does = false; proof = ofⁿ (helper ≤8) }
     where
@@ -88,12 +94,6 @@ empty-grid = grid nothing nothing nothing nothing nothing nothing nothing nothin
 
 empty-grid-unfilled : Unfilled empty-grid  
 empty-grid-unfilled = λ ()
-
-test-grid : Grid
-test-grid = grid (just x) (just o) (just x) (just o) (just x) (just o) (just x) (just x) (just o)
-
-test-grid-filled : Filled test-grid 
-test-grid-filled = refl  
 
 won : Grid → Maybe Player       
 won (grid (just x) (just x) (just x) middle-left middle-middle middle-right bottom-left bottom-middle bottom-right) = just x  
@@ -129,57 +129,58 @@ data Move (p : Player) : Grid → Grid → Set where
     move-bottom-middle : Move p (grid a b c d e f g nothing i) (grid a b c d e f g (just p) i)
     move-bottom-right : Move p (grid a b c d e f g h nothing) (grid a b c d e f g h (just p))
 
-move-lemma : ∀ {p g g'} → Move p g g' → filled g' ≡ suc (filled g)
+-- If this were longer, I'd might consider generalizing the rewrite rule
+move-lemma : ∀ {p g g'} → Move p g g' → fill g' ≡ suc (fill g)
 move-lemma move-top-left = refl
 move-lemma (move-top-middle {a} {c} {d} {e} {f} {g} {h} {i}) 
-    rewrite +-suc (filled' a) (sum (map filled' (c ∷ d ∷ e ∷ f ∷ g ∷ h ∷ i ∷ []))) = refl
+    rewrite +-suc (fill a) (sum (map fill (c ∷ d ∷ e ∷ f ∷ g ∷ h ∷ i ∷ []))) = refl
 move-lemma (move-top-right {a} {b} {d} {e} {f} {g} {h} {i})
-    rewrite +-suc (filled' b) (sum (map filled' (d ∷ e ∷ f ∷ g ∷ h ∷ i ∷ [])))
-    rewrite +-suc (filled' a) (sum (map filled' (b ∷ d ∷ e ∷ f ∷ g ∷ h ∷ i ∷ []))) = refl
+    rewrite +-suc (fill b) (sum (map fill (d ∷ e ∷ f ∷ g ∷ h ∷ i ∷ [])))
+    rewrite +-suc (fill a) (sum (map fill (b ∷ d ∷ e ∷ f ∷ g ∷ h ∷ i ∷ []))) = refl
 move-lemma (move-middle-left {a} {b} {c} {e} {f} {g} {h} {i}) 
-    rewrite +-suc (filled' c) (sum (map filled' (e ∷ f ∷ g ∷ h ∷ i ∷ [])))
-    rewrite +-suc (filled' b) (sum (map filled' (c ∷ e ∷ f ∷ g ∷ h ∷ i ∷ [])))
-    rewrite +-suc (filled' a) (sum (map filled' (b ∷ c ∷ e ∷ f ∷ g ∷ h ∷ i ∷ [])))
+    rewrite +-suc (fill c) (sum (map fill (e ∷ f ∷ g ∷ h ∷ i ∷ [])))
+    rewrite +-suc (fill b) (sum (map fill (c ∷ e ∷ f ∷ g ∷ h ∷ i ∷ [])))
+    rewrite +-suc (fill a) (sum (map fill (b ∷ c ∷ e ∷ f ∷ g ∷ h ∷ i ∷ [])))
     = refl
 move-lemma (move-middle-middle {a} {b} {c} {d} {f} {g} {h} {i})
-    rewrite +-suc (filled' d) (sum (map filled' (f ∷ g ∷ h ∷ i ∷ [])))
-    rewrite +-suc (filled' c) (sum (map filled' (d ∷ f ∷ g ∷ h ∷ i ∷ [])))
-    rewrite +-suc (filled' b) (sum (map filled' (c ∷ d ∷ f ∷ g ∷ h ∷ i ∷ [])))
-    rewrite +-suc (filled' a) (sum (map filled' (b ∷ c ∷ d ∷ f ∷ g ∷ h ∷ i ∷ [])))
+    rewrite +-suc (fill d) (sum (map fill (f ∷ g ∷ h ∷ i ∷ [])))
+    rewrite +-suc (fill c) (sum (map fill (d ∷ f ∷ g ∷ h ∷ i ∷ [])))
+    rewrite +-suc (fill b) (sum (map fill (c ∷ d ∷ f ∷ g ∷ h ∷ i ∷ [])))
+    rewrite +-suc (fill a) (sum (map fill (b ∷ c ∷ d ∷ f ∷ g ∷ h ∷ i ∷ [])))
     = refl
 move-lemma (move-middle-right {a} {b} {c} {d} {e} {g} {h} {i}) 
-    rewrite +-suc (filled' e) (sum (map filled' (g ∷ h ∷ i ∷ [])))
-    rewrite +-suc (filled' d) (sum (map filled' (e ∷ g ∷ h ∷ i ∷ [])))
-    rewrite +-suc (filled' c) (sum (map filled' (d ∷ e ∷ g ∷ h ∷ i ∷ [])))
-    rewrite +-suc (filled' b) (sum (map filled' (c ∷ d ∷ e ∷ g ∷ h ∷ i ∷ [])))
-    rewrite +-suc (filled' a) (sum (map filled' (b ∷ c ∷ d ∷ e ∷ g ∷ h ∷ i ∷ [])))
+    rewrite +-suc (fill e) (sum (map fill (g ∷ h ∷ i ∷ [])))
+    rewrite +-suc (fill d) (sum (map fill (e ∷ g ∷ h ∷ i ∷ [])))
+    rewrite +-suc (fill c) (sum (map fill (d ∷ e ∷ g ∷ h ∷ i ∷ [])))
+    rewrite +-suc (fill b) (sum (map fill (c ∷ d ∷ e ∷ g ∷ h ∷ i ∷ [])))
+    rewrite +-suc (fill a) (sum (map fill (b ∷ c ∷ d ∷ e ∷ g ∷ h ∷ i ∷ [])))
     = refl
 move-lemma (move-bottom-left {a} {b} {c} {d} {e} {f} {h} {i})
-    rewrite +-suc (filled' f) (sum (map filled' (h ∷ i ∷ [])))
-    rewrite +-suc (filled' e) (sum (map filled' (f ∷ h ∷ i ∷ [])))
-    rewrite +-suc (filled' d) (sum (map filled' (e ∷ f ∷ h ∷ i ∷ [])))
-    rewrite +-suc (filled' c) (sum (map filled' (d ∷ e ∷ f ∷ h ∷ i ∷ [])))
-    rewrite +-suc (filled' b) (sum (map filled' (c ∷ d ∷ e ∷ f ∷ h ∷ i ∷ [])))
-    rewrite +-suc (filled' a) (sum (map filled' (b ∷ c ∷ d ∷ e ∷ f ∷ h ∷ i ∷ [])))
+    rewrite +-suc (fill f) (sum (map fill (h ∷ i ∷ [])))
+    rewrite +-suc (fill e) (sum (map fill (f ∷ h ∷ i ∷ [])))
+    rewrite +-suc (fill d) (sum (map fill (e ∷ f ∷ h ∷ i ∷ [])))
+    rewrite +-suc (fill c) (sum (map fill (d ∷ e ∷ f ∷ h ∷ i ∷ [])))
+    rewrite +-suc (fill b) (sum (map fill (c ∷ d ∷ e ∷ f ∷ h ∷ i ∷ [])))
+    rewrite +-suc (fill a) (sum (map fill (b ∷ c ∷ d ∷ e ∷ f ∷ h ∷ i ∷ [])))
     = refl
 move-lemma (move-bottom-middle {a} {b} {c} {d} {e} {f} {g} {i}) 
-    rewrite +-suc (filled' g) (sum (map filled' (i ∷ [])))
-    rewrite +-suc (filled' f) (sum (map filled' (g ∷ i ∷ [])))
-    rewrite +-suc (filled' e) (sum (map filled' (f ∷ g ∷ i ∷ [])))
-    rewrite +-suc (filled' d) (sum (map filled' (e ∷ f ∷ g ∷ i ∷ [])))
-    rewrite +-suc (filled' c) (sum (map filled' (d ∷ e ∷ f ∷ g ∷ i ∷ [])))
-    rewrite +-suc (filled' b) (sum (map filled' (c ∷ d ∷ e ∷ f ∷ g ∷ i ∷ [])))
-    rewrite +-suc (filled' a) (sum (map filled' (b ∷ c ∷ d ∷ e ∷ f ∷ g ∷ i ∷ [])))
+    rewrite +-suc (fill g) (sum (map fill (i ∷ [])))
+    rewrite +-suc (fill f) (sum (map fill (g ∷ i ∷ [])))
+    rewrite +-suc (fill e) (sum (map fill (f ∷ g ∷ i ∷ [])))
+    rewrite +-suc (fill d) (sum (map fill (e ∷ f ∷ g ∷ i ∷ [])))
+    rewrite +-suc (fill c) (sum (map fill (d ∷ e ∷ f ∷ g ∷ i ∷ [])))
+    rewrite +-suc (fill b) (sum (map fill (c ∷ d ∷ e ∷ f ∷ g ∷ i ∷ [])))
+    rewrite +-suc (fill a) (sum (map fill (b ∷ c ∷ d ∷ e ∷ f ∷ g ∷ i ∷ [])))
     = refl
 move-lemma (move-bottom-right {a} {b} {c} {d} {e} {f} {g} {h}) 
-    rewrite +-suc (filled' h) (sum (map filled' []))
-    rewrite +-suc (filled' g) (sum (map filled' (h ∷ [])))
-    rewrite +-suc (filled' f) (sum (map filled' (g ∷ h ∷ [])))
-    rewrite +-suc (filled' e) (sum (map filled' (f ∷ g ∷ h ∷ [])))
-    rewrite +-suc (filled' d) (sum (map filled' (e ∷ f ∷ g ∷ h ∷ [])))
-    rewrite +-suc (filled' c) (sum (map filled' (d ∷ e ∷ f ∷ g ∷ h ∷ [])))
-    rewrite +-suc (filled' b) (sum (map filled' (c ∷ d ∷ e ∷ f ∷ g ∷ h ∷ [])))
-    rewrite +-suc (filled' a) (sum (map filled' (b ∷ c ∷ d ∷ e ∷ f ∷ g ∷ h ∷ [])))
+    rewrite +-suc (fill h) 0
+    rewrite +-suc (fill g) (sum (map fill (h ∷ [])))
+    rewrite +-suc (fill f) (sum (map fill (g ∷ h ∷ [])))
+    rewrite +-suc (fill e) (sum (map fill (f ∷ g ∷ h ∷ [])))
+    rewrite +-suc (fill d) (sum (map fill (e ∷ f ∷ g ∷ h ∷ [])))
+    rewrite +-suc (fill c) (sum (map fill (d ∷ e ∷ f ∷ g ∷ h ∷ [])))
+    rewrite +-suc (fill b) (sum (map fill (c ∷ d ∷ e ∷ f ∷ g ∷ h ∷ [])))
+    rewrite +-suc (fill a) (sum (map fill (b ∷ c ∷ d ∷ e ∷ f ∷ g ∷ h ∷ [])))
     = refl
 
 CatsGame : Grid → Set  
@@ -196,16 +197,16 @@ match fˣ fᵒ = go 9 x empty-grid empty-grid-unfilled refl ≤-refl
     -- n and it's related proofs are needed to appease the termination checker 
     -- so that go decreases it's argument n
     -- we basically prove that every game must end by the 9th move 
-    go : ∀ n → Player → (g : Grid) → Unfilled g → filled g ≡ ∣ 9 - n ∣ → 9 ≥ n → Maybe Player  
+    go : ∀ n → Player → (g : Grid) → Unfilled g → fill g ≡ ∣ 9 - n ∣ → 9 ≥ n → Maybe Player  
     go zero _ g u p _ = ⊥-elim (u p)  
     go (suc n) x g u p (s≤s 8≥n) 
-        with (filledDec {proj₁ (fˣ g u)}) 
+        with (filledDec (proj₁ (fˣ g u)))
     ... | yes filled = won (proj₁ (fˣ g u)) 
     ... | no unfilled = 
         let p' = trans (trans (move-lemma (proj₂ (fˣ g u))) (cong suc p)) (suc-∣a-b∣ (s≤s 8≥n)) in
         go n o (proj₁ (fˣ g u)) unfilled p' (≤-step 8≥n)
     go (suc n) o g u p (s≤s 8≥n) 
-        with (filledDec {proj₁ (fᵒ g u)}) 
+        with (filledDec (proj₁ (fᵒ g u))) 
     ... | yes filled = won (proj₁ (fᵒ g u)) 
     ... | no unfilled = 
         let p' = trans (trans (move-lemma (proj₂ (fᵒ g u))) (cong suc p)) (suc-∣a-b∣ (s≤s 8≥n)) in
